@@ -7,65 +7,84 @@ from telegram.ext import (
     ContextTypes,
 )
 
-# =========================
+# =====================
 # CONFIG
-# =========================
+# =====================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-GROUP_ID = int(os.getenv("GROUP_ID", "0"))
+GROUP_ID = int(os.getenv("GROUP_ID"))  # ej: -1002932339573
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
+    level=logging.INFO
 )
 
-# =========================
-# HANDLERS
-# =========================
+# =====================
+# HELPERS
+# =====================
+async def is_allowed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    if update.effective_chat.id != GROUP_ID:
+        await update.message.reply_text("⛔ Este bot solo funciona dentro del grupo Academia CK.")
+        return False
+    return True
+
+# =====================
+# COMMANDS
+# =====================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-
-    if chat_id != GROUP_ID and update.effective_chat.type != "private":
-        return
-
-    await update.message.reply_text(
-        "🤖 *AlertasTradingVip_bot activo*\n\n"
-        "Este bot es exclusivo para la *Academia CK*.\n\n"
-        "Comandos disponibles:\n"
-        "/dca → Calculadora BTC DCA",
-        parse_mode="Markdown"
-    )
-
-async def dca(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-
-    if chat_id != GROUP_ID:
-        await update.message.reply_text(
-            "❌ Acceso denegado.\nEste comando solo funciona en el grupo oficial."
-        )
+    if not await is_allowed(update, context):
         return
 
     await update.message.reply_text(
         "📊 *Calculadora BTC DCA*\n\n"
-        "✔ Conversión USDT → BTC\n"
-        "✔ Gestión de capital\n"
-        "✔ Hasta *25 niveles DCA*\n\n"
-        "⚠️ No se aceptan más de 25 recompras.",
+        "Usa el comando:\n"
+        "`/dca capital precio niveles porcentaje`\n\n"
+        "Ejemplo:\n"
+        "`/dca 500 80000 10 2`",
         parse_mode="Markdown"
     )
 
-# =========================
+async def dca(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_allowed(update, context):
+        return
+
+    try:
+        capital = float(context.args[0])
+        precio = float(context.args[1])
+        niveles = int(context.args[2])
+        porcentaje = float(context.args[3])
+
+        if niveles > 25:
+            await update.message.reply_text("⚠️ Máximo permitido: 25 niveles DCA.")
+            return
+
+        mensaje = f"📉 *BTC DCA*\n\nCapital: {capital} USDT\nPrecio inicial: {precio}\n\n"
+        precio_actual = precio
+
+        for i in range(1, niveles + 1):
+            mensaje += f"Nivel {i}: {precio_actual:.2f}\n"
+            precio_actual *= (1 - porcentaje / 100)
+
+        await update.message.reply_text(mensaje, parse_mode="Markdown")
+
+    except Exception:
+        await update.message.reply_text(
+            "❌ Error en los parámetros.\n"
+            "Uso correcto:\n"
+            "`/dca capital precio niveles porcentaje`",
+            parse_mode="Markdown"
+        )
+
+# =====================
 # MAIN
-# =========================
+# =====================
 def main():
-    if not BOT_TOKEN:
-        raise RuntimeError("BOT_TOKEN no definido")
+    print("🚀 AlertasTradingVip_bot iniciando...")
 
     app = Application.builder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("dca", dca))
 
-    print("🤖 AlertasTradingVip_bot iniciado correctamente")
     app.run_polling()
 
 if __name__ == "__main__":
