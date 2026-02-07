@@ -1,5 +1,4 @@
 import os
-import logging
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -7,86 +6,98 @@ from telegram.ext import (
     ContextTypes,
 )
 
-# =====================
-# CONFIG
-# =====================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-GROUP_ID = int(os.getenv("GROUP_ID"))  # ej: -1002932339573
+GROUP_ID = int(os.getenv("GROUP_ID"))
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO
-)
-
-# =====================
-# HELPERS
-# =====================
-async def is_allowed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    if update.effective_chat.id != GROUP_ID:
-        await update.message.reply_text("⛔ Este bot solo funciona dentro del grupo Academia CK.")
+# =========================
+# UTILIDAD: verificar miembro
+# =========================
+async def is_member(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    try:
+        member = await context.bot.get_chat_member(GROUP_ID, user_id)
+        return member.status in ("member", "administrator", "creator")
+    except:
         return False
-    return True
 
-# =====================
-# COMMANDS
-# =====================
+
+# =========================
+# /start
+# =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_allowed(update, context):
+    if update.effective_chat.type != "private":
+        return
+
+    user_id = update.effective_user.id
+
+    if not await is_member(user_id, context):
+        await update.message.reply_text(
+            "🚫 Acceso restringido\n\n"
+            "Este bot es exclusivo para miembros del grupo *Academia CK*."
+        )
         return
 
     await update.message.reply_text(
-        "📊 *Calculadora BTC DCA*\n\n"
-        "Usa el comando:\n"
-        "`/dca capital precio niveles porcentaje`\n\n"
-        "Ejemplo:\n"
-        "`/dca 500 80000 10 2`",
-        parse_mode="Markdown"
+        "✅ Acceso confirmado\n\n"
+        "Comandos disponibles:\n"
+        "/dca → Calculadora BTC DCA\n"
+        "/help → Ayuda"
     )
 
-async def dca(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_allowed(update, context):
+
+# =========================
+# /help
+# =========================
+async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != "private":
         return
 
-    try:
-        capital = float(context.args[0])
-        precio = float(context.args[1])
-        niveles = int(context.args[2])
-        porcentaje = float(context.args[3])
+    user_id = update.effective_user.id
 
-        if niveles > 25:
-            await update.message.reply_text("⚠️ Máximo permitido: 25 niveles DCA.")
-            return
+    if not await is_member(user_id, context):
+        await update.message.reply_text("🚫 No tienes acceso.")
+        return
 
-        mensaje = f"📉 *BTC DCA*\n\nCapital: {capital} USDT\nPrecio inicial: {precio}\n\n"
-        precio_actual = precio
+    await update.message.reply_text(
+        "📘 *Ayuda – Academia CK*\n\n"
+        "/dca → Ejecutar calculadora DCA\n"
+        "El bot funciona solo en privado."
+    )
 
-        for i in range(1, niveles + 1):
-            mensaje += f"Nivel {i}: {precio_actual:.2f}\n"
-            precio_actual *= (1 - porcentaje / 100)
 
-        await update.message.reply_text(mensaje, parse_mode="Markdown")
+# =========================
+# /dca (placeholder)
+# =========================
+async def dca(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != "private":
+        return
 
-    except Exception:
-        await update.message.reply_text(
-            "❌ Error en los parámetros.\n"
-            "Uso correcto:\n"
-            "`/dca capital precio niveles porcentaje`",
-            parse_mode="Markdown"
-        )
+    user_id = update.effective_user.id
 
-# =====================
+    if not await is_member(user_id, context):
+        await update.message.reply_text("🚫 Acceso denegado.")
+        return
+
+    # AQUÍ luego va tu lógica DCA completa
+    await update.message.reply_text(
+        "📊 *Calculadora BTC DCA*\n\n"
+        "Aquí irá la calculadora completa.\n"
+        "Acceso exclusivo confirmado ✅"
+    )
+
+
+# =========================
 # MAIN
-# =====================
+# =========================
 def main():
-    print("🚀 AlertasTradingVip_bot iniciando...")
-
     app = Application.builder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("dca", dca))
 
+    print("🤖 AlertasTradingVip_bot iniciado correctamente")
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()
-
